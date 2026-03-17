@@ -1,0 +1,65 @@
+# BASE DE DATOS POSTGRESQL
+
+services:
+  db:
+    image: postgres:16
+    container_name: tasks_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+  
+# Usa la imagen oficial de PostgreSQL
+# Crea el servicio db
+# toma variables desde .env
+# Expone el puerto 5432
+# Guarda datos en un volumen pesistente
+
+# BACKEND (DJANGO REST FRAMEWORK)
+  backend:
+    user: "${UID:-1000}:${GID:-1000}"
+    build: ./backend
+    container_name: tasks_backend
+    restart: unless-stopped # Docker intentará levantar el servicio a menos que yo lo detenga
+    env_file:
+      - .env
+    ports:
+      - "${BACKEND_PORT}:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - db
+    command: python3 manage.py runserver 0.0.0:8000
+    networks:
+      - app_network
+
+# FRONTEND (REACT/VITE)
+
+  frontend:
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    build: ./frontend
+    container_name: tasks_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT}:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    command: npm run dev -- --host
+    networks:
+      - app_network
+
+volumes:
+  postgres_data:
+  frontend_node_modules:
+
+networks:
+  app_network:
+
