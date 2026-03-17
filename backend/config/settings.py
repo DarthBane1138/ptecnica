@@ -79,6 +79,8 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+POSTGRES_SCHEMA = os.getenv("POSTGRES_SCHEMA", "public").strip() or "public"
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -87,6 +89,9 @@ DATABASES = {
         "PASSWORD": os.getenv("POSTGRES_PASSWORD", "postgres"),
         "HOST": os.getenv("POSTGRES_HOST", "db"),
         "PORT": os.getenv("POSTGRES_PORT", "5432"),
+        "OPTIONS": {
+            "options": f"-c search_path={POSTGRES_SCHEMA},public",
+        },
     }
 }
 
