@@ -1,0 +1,10 @@
+Django == 6.0.3
+djangorestframework == 3.16.1
+psycopg[binary] == 3.3.3
+langchain - google - genai == 4.2.1
+
+
+# Psycopg es el adaptador más popular para bases de datos PostgreSQL en  Python.
+# Es una biblioteca que permite a las aplicaciones de Python conectarse, interactuar y 
+# gestionar bases de datos PostgreSQL mediante operaciones como consultas, inserciones,
+# actualizaciones y eliminaciones de datos.
