@@ -1,0 +1,14 @@
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
+
+from .views import CategoryViewSet, TaskViewSet, healthcheck, suggest_subtasks
+
+router = DefaultRouter()
+router.register("tasks", TaskViewSet, basename="task")
+router.register("categories", CategoryViewSet, basename="category")
+
+urlpatterns = [
+    path("", include(router.urls)),
+    path("health/", healthcheck, name="healthcheck"),
+    path("suggest-subtasks/", suggest_subtasks, name="suggest-subtasks"),
+]
