@@ -5,6 +5,7 @@ from rest_framework.response import Response
 
 from .models import Category, Task
 from .serializers import CategorySerializer, SuggestSubtasksSerializer, TaskSerializer
+from .services.openai_service import OpenAIServiceError, suggest_subtasks_with_openai
 
 
 class TaskViewSet(viewsets.ModelViewSet):
@@ -31,14 +32,15 @@ def suggest_subtasks(request):
     serializer.is_valid(raise_exception=True)
 
     title = serializer.validated_data["title"].strip()
-    normalized = title[0].upper() + title[1:] if title else "Task"
+    try:
+        result = suggest_subtasks_with_openai(title)
+    except OpenAIServiceError as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-    suggestions = [
-        f"Define the scope for {normalized}",
-        f"Prepare the resources needed for {normalized}",
-        f"Review and close {normalized}",
-    ]
-    return Response({"title": normalized, "subtasks": suggestions}, status=status.HTTP_200_OK)
+    return Response(
+        {"title": result.title, "subtasks": result.subtasks},
+        status=status.HTTP_200_OK,
+    )
 
 
 def healthcheck(_request):
