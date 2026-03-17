@@ -10,7 +10,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "${POSTGRES_PORT}:5435"
+      - "${POSTGRES_HOST_PORT:-5435}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -36,7 +36,7 @@ services:
       - ./backend:/app
     depends_on:
       - db
-    command: python3 manage.py runserver 0.0.0:8000
+    command: sh -c "python3 bootstrap_db.py && python3 manage.py migrate && python3 manage.py runserver 0.0.0.0:8000"
     networks:
       - app_network
 
@@ -61,4 +61,3 @@ volumes:
 
 networks:
   app_network:
-
