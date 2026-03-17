@@ -3,7 +3,7 @@
 services:
   db:
     image: postgres:16
-    container_name: tasks_db
+    container_name: tareas_db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -26,7 +26,7 @@ services:
   backend:
     user: "${UID:-1000}:${GID:-1000}"
     build: ./backend
-    container_name: tasks_backend
+    container_name: tareas_backend
     restart: unless-stopped # Docker intentará levantar el servicio a menos que yo lo detenga
     env_file:
       - .env
@@ -45,7 +45,7 @@ services:
   frontend:
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     build: ./frontend
-    container_name: tasks_frontend
+    container_name: tareas_frontend
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT}:5173"
