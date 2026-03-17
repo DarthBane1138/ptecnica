@@ -1,8 +1,13 @@
-import type { TaskInput } from "../types/task";
+import type { Category, TaskInput } from "../types/task";
 import apiClient from "./client";
 
 export async function getTasks() {
     const response = await apiClient.get("/tasks/");
+    return response.data;
+}
+
+export async function getCategories(): Promise<Category[]> {
+    const response = await apiClient.get("/categories/");
     return response.data;
 }
 
@@ -26,7 +31,7 @@ export async function deleteTask(id: number) {
     return response.data;
 }
 
-export async function suggestSubtask(title: string) {
+export async function suggestSubtasks(title: string) {
     const response = await apiClient.post("/suggest-subtasks/", { title });
     return response.data;
 }

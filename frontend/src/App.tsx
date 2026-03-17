@@ -1,7 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import axios from 'axios'
 import './App.css'
-import { createTask, getTasks } from './api/tasksService'
-import type { Task } from './types/task'
+import { completeTask, createTask, deleteTask, getCategories, getTasks, suggestSubtasks } from './api/tasksService'
+import type { Category, SubtaskSuggestionResponse, Task } from './types/task'
+
+const statusLabels: Record<Task['status'], string> = {
+  pending: 'Pending',
+  in_progress: 'In Progress',
+  completed: 'Completed',
+}
 
 function App() {
   const [title, setTitle] = useState('')
@@ -10,7 +17,12 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [tasks, setTasks] = useState<Task[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [isLoadingTasks, setIsLoadingTasks] = useState(true)
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true)
+  const [isSuggestingSubtasks, setIsSuggestingSubtasks] = useState(false)
+  const [subtaskSuggestions, setSubtaskSuggestions] = useState<string[]>([])
+  const [suggestionTitle, setSuggestionTitle] = useState('')
 
   const loadTasks = async () => {
     setIsLoadingTasks(true)
@@ -26,9 +38,51 @@ function App() {
     }
   }
 
+  const loadCategories = async () => {
+    setIsLoadingCategories(true)
+
+    try {
+      const data = await getCategories()
+      const nextCategories = Array.isArray(data) ? data : []
+      setCategories(nextCategories)
+      setCategory((currentCategory) => {
+        if (currentCategory && nextCategories.some((item) => item.name === currentCategory)) {
+          return currentCategory
+        }
+
+        return nextCategories[0]?.name ?? ''
+      })
+    } catch {
+      setFeedback('Could not load categories. Please check the API and try again.')
+      setCategories([])
+      setCategory('')
+    } finally {
+      setIsLoadingCategories(false)
+    }
+  }
+
   useEffect(() => {
     void loadTasks()
+    void loadCategories()
   }, [])
+
+  const handleComplete = async (id: number) => {
+    try {
+      await completeTask(id)
+      await loadTasks()
+    } catch {
+      setFeedback('Could not complete the task. Please try again.')
+    }
+  }
+
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteTask(id)
+      await loadTasks()
+    } catch {
+      setFeedback('Could not delete the task. Please try again.')
+    }
+  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -51,6 +105,32 @@ function App() {
       setFeedback('Could not create task. Please check the API and try again.')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleSuggestSubtasks = async () => {
+    if (!title.trim()) {
+      setFeedback('Write a task title before requesting AI subtasks.')
+      setSubtaskSuggestions([])
+      return
+    }
+
+    setIsSuggestingSubtasks(true)
+    setFeedback('')
+
+    try {
+      const data: SubtaskSuggestionResponse = await suggestSubtasks(title.trim())
+      setSuggestionTitle(data.title)
+      setSubtaskSuggestions(Array.isArray(data.subtasks) ? data.subtasks.slice(0, 5) : [])
+    } catch (error) {
+      setSubtaskSuggestions([])
+      if (axios.isAxiosError(error) && typeof error.response?.data?.detail === 'string') {
+        setFeedback(error.response.data.detail)
+      } else {
+        setFeedback('Could not generate subtasks right now. Please try again.')
+      }
+    } finally {
+      setIsSuggestingSubtasks(false)
     }
   }
 
@@ -84,22 +164,54 @@ function App() {
           />
 
           <label htmlFor="category">Category</label>
-          <input
+          <select
             id="category"
             name="category"
-            type="text"
             value={category}
             onChange={(event) => setCategory(event.target.value)}
-            placeholder="Example: Personal"
             required
-          />
+            disabled={isLoadingCategories || categories.length === 0}
+          >
+            {isLoadingCategories ? (
+              <option value="">Loading categories...</option>
+            ) : categories.length === 0 ? (
+              <option value="">No categories available</option>
+            ) : (
+              categories.map((item) => (
+                <option key={item.id} value={item.name}>
+                  {item.name}
+                </option>
+              ))
+            )}
+          </select>
 
-          <button type="submit" disabled={isSubmitting}>
+          <button type="submit" disabled={isSubmitting || isLoadingCategories || categories.length === 0}>
             {isSubmitting ? 'Creating...' : 'Create Task'}
+          </button>
+
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={isSuggestingSubtasks || !title.trim()}
+            onClick={() => void handleSuggestSubtasks()}
+          >
+            {isSuggestingSubtasks ? 'Thinking...' : 'Suggest subtasks'}
           </button>
         </form>
 
         {feedback && <p className="feedback">{feedback}</p>}
+
+        {subtaskSuggestions.length > 0 && (
+          <section className="suggestions-panel" aria-live="polite">
+            <h2>Suggested Subtasks</h2>
+            <p>AI suggestions for: {suggestionTitle || title}</p>
+            <ol className="suggestions-list">
+              {subtaskSuggestions.map((subtask) => (
+                <li key={subtask}>{subtask}</li>
+              ))}
+            </ol>
+          </section>
+        )}
 
         <section className="tasks-section" aria-live="polite">
           <h2>Current Tasks</h2>
@@ -112,9 +224,40 @@ function App() {
             <ul className="task-list">
               {tasks.map((task) => (
                 <li key={task.id} className="task-item">
-                  <h3>{task.title}</h3>
+                  <div className="task-item-header">
+                    <h3>{task.title}</h3>
+                    <span className={`task-status task-status-${task.status}`}>
+                      {statusLabels[task.status] ?? task.status}
+                    </span>
+                  </div>
                   <p>{task.description}</p>
-                  <small>Category: {task.category}</small>
+                  <div className="task-meta">
+                    <small>Category: {task.category || 'Uncategorized'}</small>
+                    <small>
+                      Updated:{' '}
+                      {new Date(task.updated_at).toLocaleString(undefined, {
+                        dateStyle: 'short',
+                        timeStyle: 'short',
+                      })}
+                    </small>
+                  </div>
+                  <div className="task-actions">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      disabled={task.status === 'completed'}
+                      onClick={() => void handleComplete(task.id)}
+                    >
+                      Complete
+                    </button>
+                    <button
+                      type="button"
+                      className="danger-button"
+                      onClick={() => void handleDelete(task.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
